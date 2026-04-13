@@ -1,82 +1,330 @@
-# AutoStream Social-to-Lead Agentic Workflow
+<div align="center">
 
-AutoStream is a fictional SaaS platform providing automated video editing for content creators. This project implements a conversational LangGraph-powered AI that seamlessly routes user intent, retrieves pricing/policy information using RAG, and qualifies/captures leads in a structured workflow.
+<img src="https://img.shields.io/badge/AutoStream-AI%20Agent-6366f1?style=for-the-badge&logo=robot&logoColor=white" height="40"/>
 
-## Project Structure
-```text
+# 🎬 AutoStream AI Agent
+### *Social-to-Lead Agentic Workflow*
+
+**Convert creator conversations into qualified leads — automatically.**
+
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![LangGraph](https://img.shields.io/badge/LangGraph-Stateful%20Agent-FF6B35?style=flat-square&logo=chainlink&logoColor=white)](https://langchain-ai.github.io/langgraph/)
+[![Groq](https://img.shields.io/badge/Groq-llama--3.3--70b-F55036?style=flat-square&logo=groq&logoColor=white)](https://groq.com)
+[![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Streamlit](https://img.shields.io/badge/Streamlit-UI-FF4B4B?style=flat-square&logo=streamlit&logoColor=white)](https://streamlit.io)
+[![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)](./LICENSE)
+
+</div>
+
+---
+
+## 📸 Live Demo Preview
+
+> The agent intelligently routes user intent, retrieves pricing from its knowledge base, and progressively collects lead data — name → email → platform — before executing the lead capture tool.
+
+![AutoStream AI Agent Demo](assets/demo.png)
+
+---
+
+## 🧠 What Is This?
+
+**AutoStream AI Agent** is a production-grade, **stateful conversational AI** built for ServiceHive's assignment. It simulates a real-world B2B SaaS sales agent for **AutoStream** — a fictional automated video editing platform.
+
+The agent handles multi-turn conversations via a **LangGraph state machine**, classifying every message into one of three intents and routing it through the appropriate workflow node — all while remembering context across 5–6 turns using `MemorySaver`.
+
+---
+
+## ✨ Key Features
+
+| Feature | Details |
+|---|---|
+| 🧩 **Intent Classification** | 3-way: greeting / pricing inquiry / high-intent lead |
+| 📚 **RAG Knowledge Base** | Local FAISS + HuggingFace embeddings (no paid API) |
+| 🔁 **Stateful Memory** | LangGraph `MemorySaver` + `thread_id` per session |
+| 🛡️ **Strict Tool Guard** | `mock_lead_capture()` only fires when ALL 3 fields are present |
+| ⚡ **Groq LLM** | `llama-3.3-70b-versatile` — blazing fast inference |
+| 🎨 **Premium UI** | Dark glassmorphism Streamlit SaaS interface |
+| 🔌 **REST API** | FastAPI `POST /chat` with session-aware memory |
+
+---
+
+## 🏗️ Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      Streamlit Chat UI                           │
+│           (thread_id generated per browser session)             │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │ POST /chat  {thread_id, message}
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    FastAPI Backend (:8000)                        │
+│                    app/main.py                                   │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │ invoke(state, config)
+                          ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   LangGraph State Machine                         │
+│                                                                  │
+│   START                                                          │
+│     │                                                            │
+│     ▼                                                            │
+│  [process_message] ──── classify_intent() ─────────────────┐    │
+│         │                extract_lead_info()                │    │
+│         ▼                                                   │    │
+│   ┌─────┴──────┬────────────────┐                          │    │
+│   │            │                │                          │    │
+│   ▼            ▼                ▼                          │    │
+│ [greeting] [rag_answer]  [lead_routing] ◄──────────────────┘    │
+│             │                   │                                │
+│         FAISS RAG          ┌────┴─────┐                         │
+│         KB lookup          │  Missing │                         │
+│                            │  Fields? │                         │
+│                            └────┬─────┘                         │
+│                     ┌──────────┬┴──────────┐                    │
+│                     ▼          ▼            ▼                    │
+│               [collect_name] [collect_email] [collect_platform]  │
+│                                                                  │
+│                        all fields present?                       │
+│                               │                                  │
+│                               ▼                                  │
+│                    [execute_mock_tool] ← STRICT GUARD            │
+│                     mock_lead_capture(name, email, platform)     │
+│                               │                                  │
+│                              END                                 │
+└─────────────────────────────────────────────────────────────────┘
+          Persistence: MemorySaver (thread_id keyed checkpoints)
+```
+
+---
+
+## 📁 Project Structure
+
+```
 autostream-agent/
-├── app/
-│   ├── state.py       # Defines LangGraph state (Thread dictionary)
-│   ├── tools.py       # Mock lead capture tool logic
-│   ├── rag.py         # Local huggingface embeddings FAISS retriever
-│   ├── intents.py     # LLM structured output classification logic
-│   ├── graph.py       # Core LangGraph compile (Nodes, Edges, MemorySaver)
-│   └── main.py        # FastAPI endpoints integrating the compiled Graph
-├── frontend/
-│   └── streamlit_app.py # Clean SaaS-style UI with conversation history
-├── knowledge_base.md  # Documents used for RAG
-├── requirements.txt   # Dependencies
-└── README.md          # You are here!
+│
+├── 📂 app/                          # LangGraph backend
+│   ├── state.py                     # GraphState TypedDict definition
+│   ├── intents.py                   # LLM intent classifier (structured output)
+│   ├── rag.py                       # FAISS + HuggingFace RAG chain
+│   ├── tools.py                     # mock_lead_capture() tool
+│   ├── graph.py                     # LangGraph nodes, edges, MemorySaver
+│   └── main.py                      # FastAPI POST /chat endpoint
+│
+├── 📂 frontend/
+│   └── streamlit_app.py             # Premium dark SaaS chat UI
+│
+├── 📂 assets/
+│   └── demo.png                     # UI screenshot
+│
+├── knowledge_base.md                # RAG source documents (plans + policies)
+├── requirements.txt                 # All dependencies
+├── .gitignore                       # Excludes .env, __pycache__, venvs
+└── README.md                        # This file
 ```
 
-## Architecture Explanation
+---
 
-This application implements an Agentic "Social-to-Lead" architecture using **LangGraph** to construct a highly reliable, stateful multi-turn workflow. 
-User messages flow into a Fast API backend which passes them to the LangGraph `StateGraph`. A unified `GraphState` preserves the growing conversation history and extracted lead variables (`name`, `email`, `creator_platform`).
+## 🧰 Tech Stack
 
-The entry node (`process_message_node`) intelligently branches logic:
-1. It uses an LLM to **classify intent** into greetings, pricing inquiries, or high-intent leads.
-2. It simultaneously runs a parallel structural extraction if "high intent" is active, plucking entities out of colloquial chat.
+| Layer | Technology | Purpose |
+|---|---|---|
+| **LLM** | Groq `llama-3.3-70b-versatile` | Intent classification, lead extraction, RAG answers |
+| **Agent Framework** | LangGraph | Stateful multi-turn graph with conditional routing |
+| **Embeddings** | `sentence-transformers/all-MiniLM-L6-v2` | Free local HuggingFace embeddings |
+| **Vector Store** | FAISS (CPU) | Local knowledge base retrieval |
+| **Backend** | FastAPI + Uvicorn | REST API, thread-keyed session management |
+| **Frontend** | Streamlit | Conversational SaaS UI |
+| **Memory** | LangGraph `MemorySaver` | Checkpointed state per `thread_id` |
+| **Config** | `python-dotenv` | Secure `.env` API key loading |
 
-Edges route execution to contextual responses (like `retrieve_rag_answer` for pricing queries) or into the gated lead-capture flow. In the lead-capture sequence, nodes inspect the state to ask follow-up questions iteratively. A strict mock tool execution only engages once all three explicit tracking points (Name, Email, Platform) are populated in memory. 
+---
 
-By separating intent, RAG memory retrieval, and lead management into disparate nodes, the application stays highly modular making it less prone to LLM hallucination and easily scalable.
+## 📚 Knowledge Base (RAG Source)
 
-## Why LangGraph?
-LangGraph was chosen over simple vanilla LangChain because we require strict boundaries for multi-turn lead extraction (statefulness). While a standard chain is rigid or completely uncontrolled (like an un-configured REACT agent), LangGraph lets us define precise, loop-friendly paths and persistence using `MemorySaver`. This ensures that a tool *cannot* be called prematurely due to the hardcoded routing constraints checked at the graph's edges.
+```markdown
+Basic Plan       → $29/month · 10 videos/month · 720p resolution
+Pro Plan         → $79/month · Unlimited videos · 4K resolution · AI captions
+Policies         → No refunds after 7 days · 24/7 support on Pro only
+```
 
-## Memory & State Management
-Memory is maintained locally via LangGraph's native `MemorySaver()` checkpointer. The Streamlit UI generates a unique `thread_id` per user session which is transmitted to the FastAPI layer. Graph nodes share information strictly by returning delta updates to the `GraphState` dictionary (e.g. extending messages, or updating a specific lead variable).
+---
 
-## WhatsApp Webhook Integration Strategy
-If this workflow were to be integrated with WhatsApp Business API:
-1. **Webhook Endpoint:** The FastAPI server would expose a specific `POST /webhook` route to consume Meta's payload, responding instantly to handshake challenges.
-2. **Thread ID Mapping:** The user's WhatsApp phone number would act as the LangGraph `thread_id` to reliably load state across distributed messages.
-3. **Response Delivery:** Instead of returning a synchronous HTTP JSON response, the `execute_mock_tool` or end-nodes would trigger async HTTP `POST` requests directly via Meta's Graph API to push standard text messages back to the user's handset. 
+## 🔄 Conversation Flow (Demo)
 
-## Local Run Steps
+Follow this exact sequence to test all agent capabilities:
 
-1. **Install Requirements:**
+```
+Step 1 — Greeting Detection
+  You:  "Hi there!"
+  Bot:  👋 Welcome to AutoStream! Here's how I can help...
+
+Step 2 — RAG Pricing Retrieval
+  You:  "What are your pricing plans?"
+  Bot:  📦 Basic ($29/mo) · Pro ($79/mo) + AI captions...
+
+Step 3 — High-Intent Lead Detected
+  You:  "I want to sign up for Pro for my YouTube channel"
+  Bot:  🎉 Awesome! What's your name?
+
+Step 4 — Name Collected (MemorySaver persists it)
+  You:  "Tejas Rajput"
+  Bot:  Great, Tejas! What's your email address?
+
+Step 5 — Email Collected
+  You:  "tejas@autostream.ai"
+  Bot:  ✅ Lead captured! mock_lead_capture() fires → lead_captured = True
+
+Step 6 — Guard Activates
+  You:  (any follow-up)
+  Bot:  We've already saved your details! Is there anything else?
+```
+
+> ⚡ **Note:** The `mock_lead_capture()` tool fires **only once**, only when **all 3 fields** (name + email + platform) are confirmed in the LangGraph state.
+
+---
+
+## 🚀 Local Setup
+
+### 1. Clone the Repository
+
 ```bash
-pip install -r requirements.txt
+git clone https://github.com/tejashvi-singh/AutoStream-AI-Agent.git
+cd AutoStream-AI-Agent
 ```
 
-2. **Set Environment Variables:**
-Create a `.env` in the root folder (or `export` natively):
+### 2. Install Dependencies
+
 ```bash
-GROQ_API_KEY=groq_api_key
+pip3 install -r requirements.txt
 ```
 
-3. **Run the Backend (FastAPI)**
+### 3. Configure API Key
+
+Create a `.env` file in the project root:
+
 ```bash
-cd app
-python -m uvicorn main:fastapi_app --reload --port 8000
+echo "GROQ_API_KEY=your_groq_api_key_here" > .env
 ```
-*(Or from project root: `python -m uvicorn app.main:fastapi_app --reload --port 8000`)*
 
-4. **Run the Frontend (Streamlit)**
-In a new terminal:
+Get your free Groq API key at → [console.groq.com](https://console.groq.com)
+
+### 4. Start the Backend
+
 ```bash
-streamlit run frontend/streamlit_app.py
+# Terminal 1 — Kill stale process and start FastAPI
+lsof -ti:8000 | xargs kill -9 2>/dev/null
+python3 -m uvicorn app.main:fastapi_app --reload --port 8000
 ```
 
-## Demo Conversation Flow
-Try this exact flow in the UI to see the multi-turn agent traverse all states:
-1. **User**: "Hi, tell me about your pricing" 
-   *(Triggers RAG node, returns info on Basic/Pro plans)*
-2. **User**: "I want to try the Pro plan for my YouTube channel" 
-   *(Detects high-intent, extracts platform "YouTube", triggers lead flow, asks name)*
-3. **User**: "My name is John" 
-   *(Extracts name, asks email)*
-4. **User**: "john@example.com" 
-   *(Extracts email, conditions met -> mock tool successfully executed!)*
+### 5. Start the Frontend
+
+```bash
+# Terminal 2 — Kill stale process and start Streamlit
+lsof -ti:8501 | xargs kill -9 2>/dev/null
+python3 -m streamlit run frontend/streamlit_app.py --server.port=8501
+```
+
+### 6. Open the App
+
+```
+http://localhost:8501
+```
+
+---
+
+## 🔌 WhatsApp Webhook Integration (Approach)
+
+This agent can be extended to a WhatsApp Business API lead bot in 3 steps:
+
+| Step | Implementation |
+|---|---|
+| **1. Webhook Endpoint** | Add `POST /webhook` to FastAPI to consume Meta's payload and respond to `hub.challenge` handshakes |
+| **2. Thread ID Mapping** | Use the user's WhatsApp phone number as the LangGraph `thread_id` to persist state across distributed messages |
+| **3. Response Delivery** | Replace HTTP JSON response with async POST to Meta's Graph API (`https://graph.facebook.com/v18.0/{phone_id}/messages`) to push replies back to WhatsApp |
+
+---
+
+## 🧩 Why LangGraph?
+
+> LangGraph was chosen over vanilla LangChain or a plain ReAct agent because the lead capture workflow requires **strict, ordered state transitions** — not free-form tool calling.
+
+| Problem | LangGraph Solution |
+|---|---|
+| Tool fires too early (before all fields collected) | Conditional edges with hard guards in `route_lead_capture()` |
+| State lost between API calls | `MemorySaver` checkpoints entire `GraphState` per `thread_id` |
+| Complex branching logic | Named nodes + explicit edges replace ambiguous prompt chaining |
+| Deterministic flow required | Graph structure prevents LLM from skipping steps |
+
+---
+
+## ⚙️ State Schema
+
+```python
+class GraphState(TypedDict):
+    messages:         list[AnyMessage]   # Full conversation history (append-only)
+    intent:           str | None         # Last classified intent
+    name:             str | None         # Lead's name
+    email:            str | None         # Lead's email
+    creator_platform: str | None         # YouTube / TikTok / Instagram...
+    lead_captured:    bool               # Safety flag — prevents double tool fire
+```
+
+---
+
+## 📡 API Reference
+
+### `POST /chat`
+
+```json
+// Request
+{
+  "thread_id": "uuid-string",
+  "message": "I want to try the Pro plan"
+}
+
+// Response
+{
+  "response": "🎉 Awesome choice! What's your name?",
+  "intent": "high-intent lead",
+  "lead_captured": false
+}
+```
+
+---
+
+## 📦 Dependencies
+
+```
+langgraph               # Stateful agent graph
+langchain               # Core chain abstractions
+langchain-groq          # Groq LLM integration
+langchain-community     # FAISS, TextLoader
+langchain-huggingface   # HuggingFace embeddings
+fastapi                 # REST API server
+uvicorn                 # ASGI server
+streamlit               # Chat UI
+python-dotenv           # .env loading
+faiss-cpu               # Local vector database
+sentence-transformers   # Free local embeddings
+pydantic                # Data validation
+```
+
+---
+
+## 👨‍💻 Author
+
+**Tejas Rajput**
+Built for *ServiceHive* AI Engineering Assignment
+
+[![GitHub](https://img.shields.io/badge/GitHub-tejashvi--singh-181717?style=flat-square&logo=github)](https://github.com/tejashvi-singh)
+
+---
+
+<div align="center">
+
+**⭐ Star this repo if you found it useful!**
+
+*Built with LangGraph · Groq · FastAPI · Streamlit*
+
+</div>
